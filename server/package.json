@@ -1,0 +1,10 @@
+{
+  "name": "lotd-web-port-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web server and virtual LAN relay for the Land of the Dead web port (research use only)",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.js" }
+}

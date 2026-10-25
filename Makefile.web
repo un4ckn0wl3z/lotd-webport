@@ -1,0 +1,55 @@
+# WebAssembly build (Emscripten 6, SDL2, WebGL 2).  Usage: make -f Makefile.web -j12
+# The page reads the game data from the player's own install folder (web/shell.html); `make -f Makefile.web data`
+# instead packs it into build_web/out/game.data for a private server.
+EMSDK   ?= D:/AI/emsdk
+export EMSDK
+export EM_CONFIG = $(EMSDK)/.emscripten
+EMPY    ?= $(firstword $(wildcard $(EMSDK)/python/*/python.exe) python3)
+EMCC    = $(EMPY) $(EMSDK)/upstream/emscripten/emcc.py
+GAME    = ../game
+BUILD   = build_web
+OUT     = $(BUILD)/out
+
+CFLAGS  = -O2 -fno-strict-aliasing -sUSE_SDL=2 -Isrc -Wno-unused-function
+GENFLAGS= -O2 -fno-strict-aliasing -w -Isrc
+
+# What the game reads (no installer, movies or saves): about 480 MB.
+DATA_DIRS = System Levels Textures Audio Animations Meshes KarmaData Help
+ASSETS  = $(foreach d,$(DATA_DIRS),--preload $(GAME)/$(d)@/game/$(d))
+
+# Guest memory is a static array (port_config.h); the game data lives in the in-memory file system.
+LDFLAGS = -O2 -sUSE_SDL=2 -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2 \
+          -sINITIAL_MEMORY=1024MB -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=4GB \
+          -sSTACK_SIZE=16MB -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sENVIRONMENT=web -sFORCE_FILESYSTEM=1 \
+          -sEXPORTED_RUNTIME_METHODS=callMain,ccall,cwrap,FS,addRunDependency,removeRunDependency -lidbfs.js \
+          --pre-js web/prejs.js --shell-file web/shell.html
+
+GEN_SRC = $(wildcard gen/*/rec_*.c) gen/modules.c gen/import_hle.c
+SRC     = $(wildcard src/*.c)
+OBJ     = $(patsubst gen/%.c,$(BUILD)/gen/%.o,$(GEN_SRC)) $(patsubst src/%.c,$(BUILD)/src/%.o,$(SRC))
+
+# stop make from trying to regenerate makefiles via built-in rules
+.DEFAULT_GOAL := all
+Makefile Makefile.web: ;
+
+all: $(OUT)/index.html
+
+$(OUT)/index.html: $(OBJ) web/shell.html web/prejs.js web/vnet.js
+	@mkdir -p $(OUT)
+	$(EMCC) -o $@ $(OBJ) $(LDFLAGS)
+	cp web/vnet.js $(OUT)/vnet.js
+
+data:
+	@mkdir -p $(OUT)
+	$(EMPY) $(EMSDK)/upstream/emscripten/tools/file_packager.py $(OUT)/game.data $(ASSETS) --js-output=$(OUT)/game.js --no-node
+
+$(BUILD)/gen/%.o: gen/%.c src/recomp.h
+	@mkdir -p $(dir $@)
+	$(EMCC) $(GENFLAGS) -c $< -o $@
+
+$(BUILD)/src/%.o: src/%.c $(wildcard src/*.h)
+	@mkdir -p $(BUILD)/src
+	$(EMCC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(BUILD)

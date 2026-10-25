@@ -1,0 +1,117 @@
+{
+ "modules": [
+  {
+   "file": "LOTD.exe",
+   "tag": "lotd",
+   "orig_base": 277872640,
+   "base": 277872640,
+   "size": 401408
+  },
+  {
+   "file": "MSVCR70.dll",
+   "tag": "msvcr70",
+   "orig_base": 2080374784,
+   "base": 4194304,
+   "size": 344064
+  },
+  {
+   "file": "MSVCP70.dll",
+   "tag": "msvcp70",
+   "orig_base": 2080899072,
+   "base": 4587520,
+   "size": 487424
+  },
+  {
+   "file": "Core.dll",
+   "tag": "core",
+   "orig_base": 269484032,
+   "base": 5111808,
+   "size": 1945600
+  },
+  {
+   "file": "Engine.dll",
+   "tag": "engine",
+   "orig_base": 271581184,
+   "base": 7077888,
+   "size": 6848512
+  },
+  {
+   "file": "EngineEx.dll",
+   "tag": "engineex",
+   "orig_base": 268435456,
+   "base": 13959168,
+   "size": 188416
+  },
+  {
+   "file": "Window.dll",
+   "tag": "window",
+   "orig_base": 285212672,
+   "base": 14155776,
+   "size": 532480
+  },
+  {
+   "file": "WinDrv.dll",
+   "tag": "windrv",
+   "orig_base": 286261248,
+   "base": 14745600,
+   "size": 417792
+  },
+  {
+   "file": "D3DDrv.dll",
+   "tag": "d3ddrv",
+   "orig_base": 268435456,
+   "base": 15204352,
+   "size": 282624
+  },
+  {
+   "file": "IpDrv.dll",
+   "tag": "ipdrv",
+   "orig_base": 275775488,
+   "base": 15532032,
+   "size": 299008
+  },
+  {
+   "file": "ALAudio.dll",
+   "tag": "alaudio",
+   "orig_base": 268435456,
+   "base": 15859712,
+   "size": 122880
+  },
+  {
+   "file": "Fire.dll",
+   "tag": "fire",
+   "orig_base": 273678336,
+   "base": 15990784,
+   "size": 151552
+  },
+  {
+   "file": "GUI.dll",
+   "tag": "gui",
+   "orig_base": 268435456,
+   "base": 16187392,
+   "size": 417792
+  },
+  {
+   "file": "ogg.dll",
+   "tag": "ogg",
+   "orig_base": 268435456,
+   "base": 16646144,
+   "size": 24576
+  },
+  {
+   "file": "vorbis.dll",
+   "tag": "vorbis",
+   "orig_base": 268435456,
+   "base": 16711680,
+   "size": 126976
+  },
+  {
+   "file": "vorbisfile.dll",
+   "tag": "vorbisfile",
+   "orig_base": 268435456,
+   "base": 16842752,
+   "size": 28672
+  }
+ ],
+ "dll_end": 16908288
+}

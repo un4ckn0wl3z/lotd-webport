@@ -1,0 +1,41 @@
+{
+  "all": {
+    "import_hle": {
+      "MSVCR70!_ftol": "hle_ftol",
+      "MSVCR70!_CIpow": "hle_CIpow",
+      "MSVCR70!_CIsin": "hle_CIsin",
+      "MSVCR70!_CIcos": "hle_CIcos",
+      "MSVCR70!_CItan": "hle_CItan",
+      "MSVCR70!_CIsqrt": "hle_CIsqrt",
+      "MSVCR70!_CIexp": "hle_CIexp",
+      "MSVCR70!_CIacos": "hle_CIacos",
+      "MSVCR70!_CIasin": "hle_CIasin",
+      "MSVCR70!floor": "hle_floor",
+      "MSVCR70!ceil": "hle_ceil",
+      "MSVCR70!memcpy": "hle_memcpy",
+      "MSVCR70!memset": "hle_memset",
+      "MSVCR70!strlen": "hle_strlen",
+      "MSVCR70!_setjmp3": "hle_setjmp3",
+      "MSVCR70!longjmp": "hle_longjmp",
+      "MSVCR70!memmove": "hle_memcpy"
+    }
+  },
+  "msvcr70": {
+    "unwind_jumps": [
+      "0x41ba34"
+    ]
+  },
+  "lotd": {
+    "hooks": {
+      "0x1090cec5": [
+        "host_frame_loop",
+        "0x1090cee4"
+      ]
+    }
+  },
+  "engine": {
+    "hle": {
+      "0x91b420": "hle_ret0"
+    }
+  }
+}

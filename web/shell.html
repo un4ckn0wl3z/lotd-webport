@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Land of the Dead Web</title>
+<style>
+  :root { --bg: #0a0b09; --fg: #dcd8c8; --muted: #8a8670; --accent: #b8a032; --panel: #17180f; --line: #33321f; --warn: #d9873a; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+               font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; background: #000; outline: none; }
+  #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; text-align: center;
+             justify-content: center; gap: 16px; background: rgba(6, 6, 4, .94); padding: 16px; }
+  #overlay h1 { margin: 0; font-size: 30px; letter-spacing: .06em; text-transform: uppercase; }
+  #overlay h2 { margin: -10px 0 0; font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+  #status { color: var(--muted); min-height: 1.45em; max-width: 560px; }
+  #bar { width: min(380px, 82vw); height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; }
+  #bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #play { display: none; padding: 11px 30px; font-size: 16px; color: #0a0b09; background: var(--accent);
+          border: 0; border-radius: 4px; cursor: pointer; font-weight: 600; }
+  #pick { display: none; flex-direction: column; align-items: center; gap: 10px; max-width: 560px; }
+  #pick label { padding: 10px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+  #pick input { display: none; }
+  #help { color: var(--muted); font-size: 12px; max-width: 560px; }
+  #notice { color: var(--muted); font-size: 11px; max-width: 600px; opacity: .8; }
+  kbd { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 12px; }
+  #online { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; color: var(--muted); font-size: 13px; }
+  #online input { margin-left: 6px; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+                  border-radius: 4px; padding: 4px 7px; width: 150px; }
+  #net { display: none; position: fixed; left: 10px; top: 10px; padding: 7px 10px; border-radius: 5px; font-size: 12px;
+         background: rgba(10, 10, 6, .8); border: 1px solid var(--line); line-height: 1.55; max-width: 300px; }
+  #net b { color: var(--accent); font-weight: 600; }
+  #tools { position: fixed; right: 10px; bottom: 10px; display: flex; gap: 6px; opacity: .3; transition: opacity .2s; }
+  #tools:hover { opacity: 1; }
+  #tools button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px;
+                  padding: 5px 10px; cursor: pointer; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas></div>
+<div id="overlay">
+  <h1>Land of the Dead</h1>
+  <h2>Road to Fiddler's Green</h2>
+  <div id="bar"><div></div></div>
+  <div id="status">Loading the engine…</div>
+  <div id="pick">
+    <div>Choose the folder where your copy of the game is installed (the one that contains
+         <kbd>System</kbd>, <kbd>Levels</kbd> and <kbd>Textures</kbd>). The files are read inside this browser and are
+         not uploaded anywhere.</div>
+    <label>Choose game folder…<input id="dir" type="file" webkitdirectory directory multiple></label>
+  </div>
+  <div id="online">
+    <label>Name <input id="pname" maxlength="20" placeholder="Player"></label>
+    <label>Online room <input id="proom" maxlength="32" placeholder="(empty: play offline)"></label>
+  </div>
+  <button id="play">Click to play</button>
+  <div id="help">In the game, click to capture the mouse; <kbd>Esc</kbd> releases it. Settings and saves stay in this browser.</div>
+  <div id="notice">Research and educational project: a static recompilation of the game's own Unreal Engine 2 binaries
+       running in WebAssembly. You need your own copy of Land of the Dead: Road to Fiddler's Green. Not affiliated with
+       Groove Games, Brainbox Games, Epic Games or Universal.</div>
+</div>
+<div id="tools"><button id="fs">Fullscreen</button></div>
+<div id="net"></div>
+<script src="vnet.js"></script>
+<script>
+  var canvas = document.getElementById('canvas');
+  var overlay = document.getElementById('overlay');
+  var statusEl = document.getElementById('status');
+  var barEl = document.querySelector('#bar > div');
+  var playBtn = document.getElementById('play');
+  var params = new URLSearchParams(location.search);
+
+  function fit() {
+    var w = canvas.width || 640, h = canvas.height || 480;
+    var s = Math.min(window.innerWidth / w, window.innerHeight / h);
+    canvas.style.width = Math.floor(w * s) + 'px';
+    canvas.style.height = Math.floor(h * s) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  new MutationObserver(fit).observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] });
+
+  var runtimeUp = false, dataReady = !!window.GAME_DATA_PACKAGE;
+  var Module = {
+    canvas: canvas,
+    noInitialRun: true,
+    portEnv: params.get('env') || '',     // web/prejs.js: debugging switches
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.warn(t); },
+    setStatus: function (t) {
+      var m = t.match(/\((\d+(\.\d+)?)\/(\d+)\)/);
+      if (m) barEl.style.width = (100 * m[1] / m[3]).toFixed(1) + '%';
+      var s = t.replace(/\(.*\)/, '').trim();
+      if (s) statusEl.textContent = s;
+    },
+    onRuntimeInitialized: function () {
+      runtimeUp = true;
+      barEl.style.width = '100%';
+      if (!dataReady && !window.GAME_DATA_PACKAGE) { askForFolder(); return; }
+      showPlay();
+    },
+    onGameExit: function () {
+      if (document.pointerLockElement) document.exitPointerLock();
+      overlay.style.display = 'flex';
+      playBtn.style.display = 'none';
+      statusEl.textContent = 'The game has closed. Reload the page to play again.';
+    },
+    onAbort: function (what) {
+      overlay.style.display = 'flex';
+      playBtn.style.display = 'none';
+      statusEl.textContent = 'The game stopped: ' + what + ' (see the browser console).';
+    }
+  };
+  function showPlay() {
+    statusEl.textContent = 'Ready.';
+    playBtn.style.display = 'block';
+  }
+
+  // ---------------------------------------------------------------- the game data, from the player's own install
+  // Only what the engine reads goes into the in-memory file system at /game (movies are left out).
+  var NEEDED = /^(system|levels|textures|audio|animations|meshes|karmadata|help)\//i;
+  var SKIP = /\.(log|bak|tmp)$|^system\/(setup|unins|ucc)/i;
+  function askForFolder() {
+    statusEl.textContent = 'Choose your game folder.';
+    document.getElementById('pick').style.display = 'flex';
+  }
+  document.getElementById('dir').addEventListener('change', function (ev) {
+    var list = Array.prototype.slice.call(ev.target.files), files = [], total = 0;
+    list.forEach(function (f) {
+      var parts = (f.webkitRelativePath || f.name).split('/');
+      // the chosen folder may be the game folder itself or one level above it
+      for (var i = 1; i < parts.length; i++) {
+        var rel = parts.slice(i).join('/');
+        if (NEEDED.test(rel)) { if (!SKIP.test(rel)) { files.push({ f: f, rel: rel }); total += f.size; } break; }
+      }
+    });
+    if (!files.some(function (x) { return /^system\/lotd\.exe$/i.test(x.rel); })) {
+      statusEl.textContent = 'System/LOTD.exe was not found in that folder. Choose the folder the game is installed in.';
+      return;
+    }
+    document.getElementById('pick').style.display = 'none';
+    var done = 0, i = 0, made = {};
+    function mkdirs(path) {
+      var p = '';
+      path.split('/').slice(0, -1).forEach(function (c) {
+        p += '/' + c;
+        if (!made[p]) { try { FS.mkdir(p); } catch (e) {} made[p] = 1; }
+      });
+    }
+    (function next() {
+      if (i >= files.length) { dataReady = true; showPlay(); return; }
+      var x = files[i++];
+      x.f.arrayBuffer().then(function (buf) {
+        var path = '/game/' + x.rel;
+        mkdirs(path);
+        FS.writeFile(path, new Uint8Array(buf));
+        done += x.f.size;
+        barEl.style.width = (100 * done / total).toFixed(1) + '%';
+        statusEl.textContent = 'Reading game files… ' + Math.round(done / 1048576) + ' / ' + Math.round(total / 1048576) + ' MB';
+        next();
+      }, function (e) { statusEl.textContent = 'Could not read ' + x.rel + ': ' + e; });
+    })();
+  });
+
+  // ---------------------------------------------------------------- online: the virtual LAN (web/vnet.js)
+  var nameEl = document.getElementById('pname'), roomEl = document.getElementById('proom'), netEl = document.getElementById('net');
+  try { nameEl.value = localStorage.getItem('lotd.name') || ''; roomEl.value = params.get('room') || localStorage.getItem('lotd.room') || ''; } catch (e) {}
+  function showNet() {
+    var V = window.VNet;
+    if (!V || !V.room) return;
+    netEl.style.display = 'block';
+    var who = V.players.map(function (p) { return p.name + ' <span style="opacity:.6">' + p.ip + '</span>'; }).join('<br>');
+    netEl.innerHTML = V.ip ? 'Room <b>' + V.room + '</b> &middot; you are ' + V.ipText + '<br>' + who
+                           : 'Room <b>' + V.room + '</b>: disconnected (playing offline)';
+  }
+  // online, frames keep coming from a worker timer while the tab is in the background (src/main.c)
+  function startBackgroundTicks() {
+    var src = 'setInterval(function () { postMessage(0); }, 16);';
+    var w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    w.onmessage = function () { if (Module._port_background_tick) Module._port_background_tick(); };
+  }
+  function startGame() {
+    overlay.style.display = 'none';
+    canvas.focus();
+    if (window.VNet && VNet.ip) startBackgroundTicks();
+    var args = [];
+    if (params.get('args')) args = ['--'].concat(params.get('args').split(' '));
+    Module.callMain(args);
+  }
+  playBtn.addEventListener('click', function () {
+    var room = roomEl.value.trim(), name = nameEl.value.trim() || 'Player';
+    try { localStorage.setItem('lotd.name', nameEl.value.trim()); localStorage.setItem('lotd.room', room); } catch (e) {}
+    if (!room || !window.VNet) { startGame(); return; }
+    // the relay assigns this page its LAN address before the game asks for it
+    statusEl.textContent = 'Joining room ' + room + '…';
+    Module.vnet = window.VNet;
+    VNet.onchange = showNet;
+    VNet.connect((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/net', room, name)
+      .then(function () { showNet(); startGame(); },
+            function (e) { statusEl.textContent = 'Could not join the room (' + e.message + '); starting offline.'; setTimeout(startGame, 1500); });
+  });
+  // the engine captures the mouse itself (SDL relative mode); a click re-captures after Esc released it
+  canvas.addEventListener('click', function () { canvas.focus(); });
+  window.addEventListener('keydown', function (e) {
+    if ([9, 32, 37, 38, 39, 40, 8, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122].indexOf(e.keyCode) >= 0 &&
+        document.activeElement === canvas) e.preventDefault();
+  });
+  document.getElementById('fs').addEventListener('click', function () {
+    (document.fullscreenElement ? document.exitFullscreen() : document.getElementById('stage').requestFullscreen()).catch(function () {});
+  });
+</script>
+<!-- a private server may ship the data as a package (make -f Makefile.web data); without it the player picks a folder -->
+<script src="game.js" onload="window.GAME_DATA_PACKAGE = true"></script>
+{{{ SCRIPT }}}
+</body>
+</html>

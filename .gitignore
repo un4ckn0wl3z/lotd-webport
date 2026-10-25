@@ -1,0 +1,29 @@
+# Game-derived material: never commit (regenerate from your own copy of the game)
+gen/
+*.exe
+*.dll
+*.i64
+*.idb
+*.data
+*.bik
+
+# Build output and test runs
+build/
+build_mc/
+build_web/
+run/
+save/
+*.o
+*.log
+shot_*.bmp
+shot_*.png
+grid.png
+
+# Third-party binaries (SDL2, see README)
+thirdparty/
+
+# Server runtime files
+server/node_modules/
+server/cache/
+
+__pycache__/
