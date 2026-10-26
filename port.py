@@ -297,14 +297,15 @@ def main():
     ap.add_argument('--password', help='serve: require this password (HTTP basic auth); use it whenever others can reach the server')
     ap.add_argument('--no-data', action='store_true', help='web: no game.data package; every player picks their own game folder in the page')
     ap.add_argument('--force', action='store_true', help='redo the analysis and code generation')
-    ap.add_argument('args', nargs=argparse.REMAINDER, help='run: game command line after --, e.g. -- CH01')
-    a = ap.parse_args()
+    argv = sys.argv[1:]
+    extra = argv[argv.index('--') + 1:] if '--' in argv else []      # run: game command line after --, e.g. -- CH01
+    a = ap.parse_args(argv[:argv.index('--')] if '--' in argv else argv)
     if a.command == 'serve': return serve(a.port, a.password)
     g = game_dir(a)
     if a.command == 'gen': return generate(g, a.force)
     if a.force: generate(g, True)
     if a.command == 'native': return build_native(g)
-    if a.command == 'run': return play_native(g, [x for x in a.args if x != '--'])
+    if a.command == 'run': return play_native(g, extra)
     build_web(g, not a.no_data)
     if a.command == 'all': serve(a.port, a.password)
 
