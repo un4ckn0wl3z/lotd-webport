@@ -681,11 +681,21 @@ static void u_SetCursorPos(void) {
     mouse_x = (int32_t)ARG(0) - (w ? w->x : 0); mouse_y = (int32_t)ARG(1) - (w ? w->y : 0);
     SRET(1, 2);
 }
+#ifdef __EMSCRIPTEN__
+// The page owns pointer lock (web/shell.html: Module.onWantPointerLock): browsers grant it only inside a click or
+// key handler, and SDL's relative mode never asks for it when the pointer has not entered the canvas yet (no mouse
+// focus) nor again after Esc released it. Locked, SDL still reports movementX/Y as relative motion.
+EM_JS(void, web_want_pointer_lock, (int want), { if (Module.onWantPointerLock) Module.onWantPointerLock(!!want); });
+#endif
 static void update_capture(void) {
     int want = cursor_count < 0;
     if (want != captured) {
         captured = want;
+#ifdef __EMSCRIPTEN__
+        web_want_pointer_lock(want);
+#else
         SDL_SetRelativeMouseMode(want ? SDL_TRUE : SDL_FALSE);
+#endif
         host_log("mouse %s\n", want ? "captured (relative)" : "released");
     }
 }

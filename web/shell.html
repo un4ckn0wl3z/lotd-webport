@@ -31,6 +31,9 @@
   #net { display: none; position: fixed; left: 10px; top: 10px; padding: 7px 10px; border-radius: 5px; font-size: 12px;
          background: rgba(10, 10, 6, .8); border: 1px solid var(--line); line-height: 1.55; max-width: 300px; }
   #net b { color: var(--accent); font-weight: 600; }
+  #lockhint { display: none; position: fixed; left: 50%; bottom: 14%; transform: translateX(-50%); padding: 8px 16px;
+              border-radius: 5px; background: rgba(10, 10, 6, .85); border: 1px solid var(--accent); color: var(--fg);
+              font-size: 14px; pointer-events: none; }
   #tools { position: fixed; right: 10px; bottom: 10px; display: flex; gap: 6px; opacity: .3; transition: opacity .2s; }
   #tools:hover { opacity: 1; }
   #tools button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px;
@@ -55,13 +58,14 @@
     <label>Online room <input id="proom" maxlength="32" placeholder="(empty: play offline)"></label>
   </div>
   <button id="play">Click to play</button>
-  <div id="help">In the game, click to capture the mouse; <kbd>Esc</kbd> releases it. Settings and saves stay in this browser.</div>
+  <div id="help">In play the mouse is captured on your first click or key press; <kbd>Esc</kbd> releases it and a click takes it back. Settings and saves stay in this browser.</div>
   <div id="notice">Research and educational project: a static recompilation of the game's own Unreal Engine 2 binaries
        running in WebAssembly. You need your own copy of Land of the Dead: Road to Fiddler's Green. Not affiliated with
        Groove Games, Brainbox Games, Epic Games or Universal.</div>
 </div>
 <div id="tools"><button id="fs">Fullscreen</button></div>
 <div id="net"></div>
+<div id="lockhint">Click the game to capture the mouse</div>
 <script src="vnet.js"></script>
 <script>
   var canvas = document.getElementById('canvas');
@@ -199,7 +203,32 @@
       .then(function () { showNet(); startGame(); },
             function (e) { statusEl.textContent = 'Could not join the room (' + e.message + '); starting offline.'; setTimeout(startGame, 1500); });
   });
-  // the engine captures the mouse itself (SDL relative mode); a click re-captures after Esc released it
+  // Pointer lock: the game asks for it while it hides the cursor (in play; src/user32.c update_capture) and the
+  // page takes it on the next click or key press in the game, which browsers require. Esc releases it; a click
+  // takes it again. Raw (unadjusted) movement where the browser has it, so mouse look ignores OS acceleration.
+  var wantLock = false, lockHint = document.getElementById('lockhint');
+  function showLockHint() {
+    lockHint.style.display = wantLock && document.pointerLockElement !== canvas && overlay.style.display === 'none' ? 'block' : 'none';
+  }
+  function takeLock() {
+    if (!wantLock || document.pointerLockElement === canvas) return;
+    var plain = function () { try { var q = canvas.requestPointerLock(); if (q && q.catch) q.catch(function () {}); } catch (e) {} };
+    try {
+      var p = canvas.requestPointerLock({ unadjustedMovement: true });
+      if (p && p.catch) p.catch(function (e) { if (e && e.name === 'NotSupportedError') plain(); });
+    } catch (e) { plain(); }
+  }
+  Module.onWantPointerLock = function (want) {
+    wantLock = want;
+    if (want) takeLock();           // works when this frame runs inside an input handler; otherwise the next one
+    else if (document.pointerLockElement) document.exitPointerLock();
+    showLockHint();
+  };
+  document.addEventListener('pointerlockchange', showLockHint);
+  canvas.addEventListener('mousedown', function () { canvas.focus(); takeLock(); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' && document.activeElement === canvas) takeLock();
+  });
   canvas.addEventListener('click', function () { canvas.focus(); });
   window.addEventListener('keydown', function (e) {
     if ([9, 32, 37, 38, 39, 40, 8, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122].indexOf(e.keyCode) >= 0 &&
