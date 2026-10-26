@@ -27,3 +27,6 @@ server/node_modules/
 server/cache/
 
 __pycache__/
+
+# Toolchains port.py downloads
+.emsdk/
